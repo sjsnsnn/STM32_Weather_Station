@@ -113,42 +113,22 @@
       /* ===== 第 1 小步：选择通道 ===== */
 
       ADC_RegularChannelConfig(ADC1, ADC_Channel, 1,ADC_SampleTime_55Cycles5);
-      // 大白话：告诉 ADC "我要读哪个通道"，顺便设一下采样时间。
-      //
-      // 参数拆解：
-      //   ADC1             →用 ADC1 这个模块
-      //   ADC_Channel      →你传进来的通道号（PA0 = 0，PA1 = 1 ...）
-      //   ADC_SampleTime_55Cycles5 →采样时间设为 55.5 个时钟周期
-      //
-      // 什么是"采样时间"？
-      //   ADC 不是瞬间完成转换的，它需要一小段时间去"感受"电压。
-      //   采样时间越长，读数越稳定，但速度越慢。
-      //   55.5 个周期 ≈55.5 ÷12MHz ≈4.6μs，对于光敏传感器绰绰有余。
-      //   如果你用最快的 1.5 个周期，读数可能会抖；初学者先用长的，稳。
+      
 
       /* ===== 第 2 小步：启动转换 ===== */
 
       ADC_SoftwareStartConvCmd(ADC1, ENABLE);
-      // 大白话：软件喊一嗓子"开始转换！"
-      //
-      // 因为我们之前配了"软件触发"，所以转换不是自动开始的，
-      // 必须由你手动调用这行代码，ADC 才开始把当前电压变成数字。
-      // 你可以把它理解成——按了一下快门，开始拍照。
-
+      
       /* ===== 第 3 小步：等待转换完成 ===== */
-
-      while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
-      // 大白话：死循环等着，直到 ADC 说"我转完了"。
-      //
-      // ADC_FLAG_EOC = End Of Conversion（转换结束标志）
-      //   - 转换进行中 →这个标志是 RESET（0）→while 条件成立 →继续等
-      //   - 转换完成   →这个标志变成 SET（1）→while 条件不成立 →跳出循环
-      //
-      // 等待时间有多长？
-      //   采样时间(55.5周期) + 转换时间(12.5周期) = 68 个周期
-      //   68 ÷12MHz ≈5.67μs→一百万分之五秒，你完全感觉不到。
-
-      /* ===== 第 4 小步：读取结果 ===== */
+	  uint32_t timeout=10000;
+      while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+	  {
+		if(timeout--==0)
+		{
+			return 0xFFFF;
+		}
+	  }
+      
 
       return ADC_GetConversionValue(ADC1);
       // 大白话：从 ADC 的数据寄存器里，把转换好的数字拿出来，返回给调用者。
