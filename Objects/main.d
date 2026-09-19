@@ -32,3 +32,4 @@
 .\objects\main.o: .\library\Hardware\OLED.h
 .\objects\main.o: E:\keil5\ARM\ARMCC\Bin\..\include\stdio.h
 .\objects\main.o: .\library\Hardware\Serial.h
+.\objects\main.o: .\library\Hardware\Timer.h

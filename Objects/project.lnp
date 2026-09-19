@@ -31,6 +31,7 @@
 ".\objects\ad.o"
 ".\objects\oled.o"
 ".\objects\serial.o"
+".\objects\timer.o"
 --library_type=microlib --strict --scatter ".\Objects\project.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers
