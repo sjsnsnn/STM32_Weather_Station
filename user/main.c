@@ -19,13 +19,8 @@ uint32_t last_time = 0;
       AD_Init(); 	  // 初始化 ADC — 开机调一次就够了
 	  Timer_Init();
 	  
-	  uint16_t voltage;
-	  uint16_t brightness;
-	  uint16_t light_val = AD_GetValue(0);
-	  
-	  OLED_ShowString(1,1,"Light System");
-	  OLED_ShowString(3, 1, "STATUS: BRIGHT"); 
-	  printf("System startup: Light sensor ready...\r\n");
+	  OLED_ShowString(1,1,"Weather Station");
+	  printf("System startup: Light & NTC sensor ready...\r\n");
 	  
       while (1)
       {
@@ -34,35 +29,38 @@ uint32_t last_time = 0;
             last_time = g_sys_tick; // 更新上次执行的时间
             
             // --------- 1秒钟执行一次的核心业务逻辑（全部放在这里面） ---------
-          light_val = AD_GetValue(0);
-		  if(light_val==0xFFFF)
-		  {
-			OLED_ShowString(2, 1, "ADC Error!");
-			printf("Error: ADC Timeout!\r\n");
-		  }
-		  else{
-			brightness=4096-light_val;
-		    voltage=brightness*3300/4096;
-		  }
-			  
-          // light 值越大 →光越亮
-          // light 值越小 →光越暗
-          OLED_ShowString(2,1,"Val:");
-		  OLED_ShowNum(2, 5,voltage,4);
-		  OLED_ShowString(2,10,"mV");
+          uint16_t light_raw = ADC_Values[0];
+	      uint16_t ntc_raw = ADC_Values[1];
+			
+          uint16_t brightness = 4096 - light_raw; 
+          uint16_t light_voltage = brightness * 3300 / 4096;
+			
 		  
-		  if(!is_dark&&brightness<DARK_ADC_THRESHOLD)
+          uint16_t ntc_voltage = ntc_raw * 3300 / 4096;
+			
+          OLED_ShowString(2, 1, "Light:");
+          OLED_ShowNum(2, 7, light_voltage, 4); 
+          OLED_ShowString(2, 11, "mV");
+            
+          OLED_ShowString(3, 1, "NTC:  ");
+          OLED_ShowNum(3, 7, ntc_voltage, 4);
+          OLED_ShowString(3, 11, "mV");
+		  
+			if(!is_dark&&brightness<DARK_ADC_THRESHOLD)
 		  {
 			    is_dark=1;
-				OLED_ShowString(3,1,"STATUS:DARK");
-				printf("Warning: Low light, voltage: %d mV\r\n",voltage);
+				OLED_ShowString(4,1,"STATUS:DARK");
+				printf("Warning: Low light, voltage: %d mV\r\n",light_voltage);
 		  }
           else if(is_dark&&brightness>BRIGHT_ADC_THRESHOLD)
 		  {
 			  is_dark=0;
-			OLED_ShowString(3,1,"STATUS:BRIGHT");
-			  printf("Normal: Bright, voltage: %d mV\r\n",voltage);
+			OLED_ShowString(4,1,"STATUS:BRIGHT");
+			  printf("Normal: Bright, voltage: %d mV\r\n",light_voltage);
 		  }
+		  
+		  printf("光照: %d mV | NTC温度: %d mV\r\n", light_voltage, ntc_voltage);
+		  
 		}
       }
   }

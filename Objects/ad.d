@@ -28,3 +28,4 @@
 .\objects\ad.o: .\library\stm32f10x_usart.h
 .\objects\ad.o: .\library\stm32f10x_wwdg.h
 .\objects\ad.o: .\library\misc.h
+.\objects\ad.o: library\Hardware\AD.h

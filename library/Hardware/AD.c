@@ -1,14 +1,14 @@
  #include "stm32f10x.h"                  // 引入标准库，下面所有函数都靠它
-
+ #include "AD.h"
+ 
+ volatile uint16_t ADC_Values[ADC_CHANNEL_COUNT];
+ 
   void AD_Init(void)
   {
       /* ===== 第 1 步：开时钟 ===== */
 
       RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_ADC1, ENABLE);
-      // 大白话：给 GPIOA 和 ADC1 这两个"部门"通电。
-      // STM32 为了省电，所有外设出厂默认是关着的。
-      // 你不手动开，引脚和 ADC 就是一块砖——什么都不会响应。
-      // GPIOA 和 ADC1 都挂在 APB2 总线上，所以用 RCC_APB2PeriphClockCmd。
+      RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
 
       RCC_ADCCLKConfig(RCC_PCLK2_Div6);
       // 大白话：给 ADC 设一个合适的"心跳速度"。
@@ -29,7 +29,7 @@
       // 如果你忘了设成 AIN，设成了浮空输入之类的——数字电路会干扰电压，
       // 读出来的值会飘，可能满屏乱跳。
 
-      GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+      GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1;
       // 大白话：选定 PA0 这个引脚。
       // PA0 对应的就是 ADC 通道 0（ADC_Channel_0）。
       // 如果光敏接在 PA1，这里就改成 GPIO_Pin_1，后面通道号改成 1。
@@ -42,6 +42,57 @@
       GPIO_Init(GPIOA, &GPIO_InitStructure);
       // 大白话：把刚才填好的"配置单"提交给 GPIOA，让它生效。
       // 这一行执行完，PA0 就正式变成模拟输入了。
+
+               /*配置 DMA =====
+       *
+       * 这是全新的部分！DMA 是"搬运工"，你要告诉它：
+       *   - 从哪里搬？（源地址 = ADC 数据寄存器）
+       *   - 搬到哪里？（目的地址 = ADC_Values 数组）
+       *   - 搬多少个？（2 个，对应两个通道）
+       *   - 搬完怎么办？（从头再来，永不停歇）
+       */
+
+      DMA_InitTypeDef DMA_InitStructure;
+
+      DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;
+      // 告诉 DMA "从 ADC1 的数据寄存器取数据"。
+      // 注意取地址（&），DMA 需要知道"从哪里搬"。
+
+      DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)ADC_Values;
+      // 告诉 DMA "搬到 ADC_Values 数组里"。
+      // 数组名本身就是首地址，不需要加 &。
+
+      DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+      // 搬运方向：外设是"源头"，内存是"目的地"。从 ADC →到数组。
+
+      DMA_InitStructure.DMA_BufferSize = ADC_CHANNEL_COUNT;
+      // 缓冲区大小 = 2。每次搬运 2 个数据。
+
+      DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+      // 外设地址不递增——来源始终是同一 ADC1->DR。
+
+      DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+      // 内存地址要递增！第一个放 [0]，第二个放 [1]。
+      // ★忘了开这个 →两个通道的数据都堆到 [0]，[1] 永远是 0！
+
+      DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+      DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_HalfWord;
+      // 每次搬 16 位（半字）。ADC 结果 12 位存在 16 位寄存器里，数组也是 uint16_t。
+
+      DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+      // ★循环模式——搬 2 个后从头再来，永不停。
+      // 这就是"连续采集"的关键！DMA 搬完 [0] 和 [1] 后自动回到 [0] 重新写。
+      // 如果设成 DMA_Mode_Normal，搬完一轮就"下班"了，数组不再更新。
+
+      DMA_InitStructure.DMA_Priority = DMA_Priority_Medium;
+      // 优先级中等。只用了 1 个 DMA 通道，填什么都行。
+
+      DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+      // 关闭"内存到内存"模式。我们要的是"外设到内存"。
+
+      DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+      // 提交给 DMA1 的通道 1。
+      // 为什么是通道 1？STM32 硬件规定了 ADC1 必须用 DMA1_Channel1。
 
       /* ===== 第 3 步：配置 ADC ===== */
 
@@ -65,22 +116,32 @@
       // "外部触发"是指用定时器之类的东西自动启动转换。
       // 我们是初学者，先学最简单的方式——想读的时候，代码里手动喊一声"开始！"
 
-      ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
+      ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
       // 大白话：关闭连续转换。每次手动触发只转换一次。
       // 如果开启（ENABLE），ADC 会不停地转，转完一次马上开始下一次。
       // 单次模式更省资源，我们只需要的时候才读。
 
-      ADC_InitStructure.ADC_ScanConvMode = DISABLE;
+      ADC_InitStructure.ADC_ScanConvMode = ENABLE;
       // 大白话：关闭扫描模式。每次只转换一个通道。
       // 扫描模式是一次触发就把所有通道都转一遍。
       // 我们只有一个光敏传感器接在通道 0，不需要扫描。
 
-      ADC_InitStructure.ADC_NbrOfChannel = 1;
+      ADC_InitStructure.ADC_NbrOfChannel = ADC_CHANNEL_COUNT;
       // 大白话：告诉 ADC "我要用 1 个通道"。
       // 扫描模式下这个值才有意义，但我们还是老老实实填上。
 
       ADC_Init(ADC1, &ADC_InitStructure);
       // 大白话：把配置单提交给 ADC1，让它生效。
+	  
+	   ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_55Cycles5);
+      // 通道 0（PA0 / 光敏），排第 1 个采集。
+      // 结果 →ADC_Values[0]
+
+      ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 2, ADC_SampleTime_55Cycles5);
+      // 通道 1（PA1 / NTC），排第 2 个采集。
+      // 结果 →ADC_Values[1]
+
+      ADC_DMACmd(ADC1, ENABLE);
 
       /* ===== 第 4 步：开启 ADC 并校准 ===== */
 
@@ -106,35 +167,12 @@
       while (ADC_GetCalibrationStatus(ADC1));
       // 大白话：等待校准完成。同样的死循环等待。
       // 校准完成后，ADC 就可以精确地把电压转换成数字了。
-  }
-  
-  uint16_t AD_GetValue(uint8_t ADC_Channel)
-  {
-      /* ===== 第 1 小步：选择通道 ===== */
-
-      ADC_RegularChannelConfig(ADC1, ADC_Channel, 1,ADC_SampleTime_55Cycles5);
-      
-
-      /* ===== 第 2 小步：启动转换 ===== */
+	  
+	  DMA_Cmd(DMA1_Channel1, ENABLE);
+      // DMA 正式上班，等待 ADC 的通知来搬数据。
 
       ADC_SoftwareStartConvCmd(ADC1, ENABLE);
-      
-      /* ===== 第 3 小步：等待转换完成 ===== */
-	  uint32_t timeout=10000;
-      while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
-	  {
-		if(timeout--==0)
-		{
-			return 0xFFFF;
-		}
-	  }
-      
-
-      return ADC_GetConversionValue(ADC1);
-      // 大白话：从 ADC 的数据寄存器里，把转换好的数字拿出来，返回给调用者。
-      //
-      // 因为之前我们设了"右对齐"，所以这里拿到的就是 0~4095 的整数。
-      // 而且读这个寄存器的同时，硬件会自动把 EOC 标志清零——
-      // 下次再启动转换时，不用你手动清标志，省一步。
+      // 软件触发第一次转换。
+      // 因为开了连续模式，ADC 转完这一次后会自动开始下一次。
+      // 你只需要触发这一次，后面全是自动的。
   }
-	
