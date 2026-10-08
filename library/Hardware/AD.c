@@ -137,7 +137,7 @@
       // 通道 0（PA0 / 光敏），排第 1 个采集。
       // 结果 →ADC_Values[0]
 
-      ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 2, ADC_SampleTime_55Cycles5);
+      ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 2, ADC_SampleTime_239Cycles5);
       // 通道 1（PA1 / NTC），排第 2 个采集。
       // 结果 →ADC_Values[1]
 
