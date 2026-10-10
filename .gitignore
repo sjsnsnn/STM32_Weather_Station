@@ -1,0 +1,17 @@
+# Keil编译产物
+Objects/
+Listings/
+*.map
+*.axf
+*.elf
+*.o
+*.crf
+*.d
+*.lnp
+*.htm
+*.uvoptx
+*.uvguix.*
+
+# 备份文件
+*.bak
+*.log

@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>.\start;.\library;.\user;.\system;.\Hardware;.\library\Hardware;.\FreeRTOS\Source\include;.\FreeRTOS\Source\portable\RVDS\ARM_CM3</IncludePath>
+              <IncludePath>.\start;.\library;.\user;.\system;.\Hardware;.\FreeRTOS\Source\include;.\FreeRTOS\Source\portable\RVDS\ARM_CM3</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -693,17 +693,37 @@
             <File>
               <FileName>AD.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\library\Hardware\AD.c</FilePath>
+              <FilePath>.\Hardware\AD.c</FilePath>
             </File>
             <File>
               <FileName>OLED.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\library\Hardware\OLED.c</FilePath>
+              <FilePath>.\Hardware\OLED.c</FilePath>
             </File>
             <File>
               <FileName>Serial.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\library\Hardware\Serial.c</FilePath>
+              <FilePath>.\Hardware\Serial.c</FilePath>
+            </File>
+            <File>
+              <FileName>Button.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\Button.h</FilePath>
+            </File>
+            <File>
+              <FileName>Button.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\Button.c</FilePath>
+            </File>
+            <File>
+              <FileName>Menu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\Menu.h</FilePath>
+            </File>
+            <File>
+              <FileName>Menu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\Menu.c</FilePath>
             </File>
           </Files>
         </Group>
