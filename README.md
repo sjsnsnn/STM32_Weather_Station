@@ -33,6 +33,24 @@
       (I2C OLED 刷新)          (UART 串口打印)
 ```
 
+## 🗺️ 系统设计图
+
+用时序图和状态机图描述系统的**运行时行为**（源文件为 PlantUML 文本，见 [`docs/diagrams/`](docs/diagrams/)）。
+
+### 任务时序图 —— 一次按键的完整链路
+
+从**机械触点**到**屏幕刷新**，跨越 中断 / RTOS / 任务 / 驱动 四层：
+
+![任务时序图](docs/diagrams/01-task-sequence.png)
+
+### 菜单状态机 —— 三页循环切换
+
+三个页面、两个按键、**六条转移**（穷举，没有第七种可能）：
+
+![菜单状态机](docs/diagrams/02-menu-state-machine.png)
+
+> 完整说明与修改方法见 [`docs/diagrams/README.md`](docs/diagrams/README.md)
+
 ## 🔬 调试记录
 
 ### 按键抖动实测（逻辑分析仪）

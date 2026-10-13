@@ -1,0 +1,41 @@
+@startuml
+title 按键翻页 —— 任务时序图
+
+participant "机械按键\n(PB0)" as BTN
+participant "EXTI0 中断\n(ISR)" as ISR
+participant "Task_Display\n(优先级 1)" as DISP
+participant "OLED\n(软件模拟 I2C)" as OLED
+
+== 空闲 ==
+
+note over BTN, OLED: 按键未按下，PB0 被内部上拉拉高
+DISP -> DISP: xQueueReceive(超时 100ms)\n没数据，转去检查按键
+DISP -> DISP: xTaskNotifyWait(超时 0)\n没通知，回到循环开头
+
+== 按下按键 ==
+
+BTN -> ISR: PB0 由高变低（下降沿）
+activate ISR
+ISR -> ISR: ① 确认中断源
+ISR -> ISR: ② 双重确认电平为低
+ISR -> ISR: ③ 消抖：距上次 <200ms 则丢弃
+ISR -> DISP: ④ xTaskNotifyFromISR(BTN_LEFT)
+ISR -> ISR: ⑤ 清中断挂起位（必须！）
+deactivate ISR
+
+== 任务响应 ==
+
+DISP -> DISP: xTaskNotifyWait 取出通知\n并清除 bit0 / bit1
+DISP -> DISP: Menu_HandleEvent(BTN_LEFT)\n光照页 → 系统页
+
+DISP -> OLED: OLED_Clear()
+activate OLED
+OLED --> DISP: 完成
+deactivate OLED
+
+DISP -> OLED: Menu_RenderCurrentPage()\n逐字符写屏
+activate OLED
+OLED --> DISP: 完成
+deactivate OLED
+
+@enduml
