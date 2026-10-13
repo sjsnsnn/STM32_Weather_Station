@@ -160,8 +160,12 @@ void DebugMon_Handler(void)
 /******************************************************************************/
 
 /*
- * 消抖时间戳 — volatile 防止编译器优化掉对它的读取
- * 中断里写、主循环里读，不加 volatile 编译器可能把值缓存到寄存器
+ * 消抖时间戳
+ *   static   → 只在本文件（ISR）内可见，不对外暴露
+ *   volatile → 防止编译器把值缓存进寄存器
+ *   注：目前这两个变量只在中断内读写，没有跨上下文共享，
+ *       所以 volatile 并非必需；保留它是防御性写法
+ *       （将来若要允许从任务里读，不必再改这里）
  */
 static volatile TickType_t xLastLeftTick  = 0;
 static volatile TickType_t xLastRightTick = 0;

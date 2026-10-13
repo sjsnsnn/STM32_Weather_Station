@@ -28,6 +28,9 @@ void Task_Sensor(void *pvParameters)
 		  uint16_t light_raw = ADC_Values[0];
           uint16_t ntc_raw   = ADC_Values[1];
       
+		  /* ⚠️ 注意：这里对原始值做了取反（4096 - raw）。
+		     所以算出的 *_voltage 不是引脚上的真实电压，而是 3300mV 减它。
+		     串口打印和 OLED 上显示的 "mV" 都受这个取反影响。 */
 		  uint16_t brightness  = 4096 - light_raw;
           data.light_voltage   = brightness * 3300 / 4096;
           uint16_t ntcness  = 4096 - ntc_raw;
@@ -49,8 +52,9 @@ void Task_Sensor(void *pvParameters)
     while (1)
     {
         /*
-         * 改动 A：portMAX_DELAY → pdMS_TO_TICKS(100)
-         * 最多等 100ms，等不到也继续往下走检查按键
+         * 等显示数据，最多等 100ms。
+         * 这里不能用 portMAX_DELAY 死等 —— 否则按键通知要等到
+         * 下一帧传感器数据到达才被处理，按键响应会明显迟钝。
          */
         if (xQueueReceive(xDisplayQueue, &data, pdMS_TO_TICKS(100)) == pdTRUE)
         {
@@ -59,13 +63,13 @@ void Task_Sensor(void *pvParameters)
         }
 
         /*
-         * 改动 B：检查按键通知（不等待，有就有，没有就跳过）
+         * 非阻塞检查按键通知（有就处理，没有就跳过）
          *
-         * xTaskNotifyWait 参数：
-         *   0x03            → 退出时清除 bit0 和 bit1
-         *   0               → 进入时不清除
-         *   &btnNotifyValue → 通知值存到这个变量
-         *   0               → 超时 = 0，不等待
+         * xTaskNotifyWait 四个参数按顺序：
+         *   0               → 进入时不清除任何位
+         *   0x03            → 退出时清除 bit0 / bit1（消费掉，防止重复处理）
+         *   &btnNotifyValue → 通知值输出到这个变量
+         *   0               → 超时 0，不等待
          */
         if (xTaskNotifyWait(0, 0x03, &btnNotifyValue, 0) == pdTRUE)
         {
@@ -107,7 +111,7 @@ int main(void)
 	  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
       
 	  Serial_Init();
-	  OLED_Init();     // 初始化 OLED（如果你有的话）
+	  OLED_Init();     // 初始化 OLED（SSD1306，GPIO 软件模拟 I2C）
       AD_Init(); 	  // 初始化 ADC — 开机调一次就够了
 	  
 	  OLED_ShowString(1, 1, "RTOSWeather");
@@ -122,18 +126,18 @@ int main(void)
         while (1);
     }
 
-	  /* 改动 C：声明变量，用于获取 Display 任务句柄 */
+	  /* 用于接住 Display 任务的句柄，后面要交给 Button_Init */
 	  TaskHandle_t displayHandle;
 
 	  xTaskCreate(Task_Sensor,  "Sensor",  128, NULL, 3, NULL);
       xTaskCreate(Task_Display, "Display", 256, NULL, 1, &displayHandle);
       xTaskCreate(Task_Comm,    "Comm",    256, NULL, 2, NULL);
 
-	  /* 改动 D：初始化按键，传入 Display 任务句柄 */
+	  /* 按键中断里要给 Display 任务发通知，所以把句柄传进去 */
 	  Button_Init(displayHandle);
 
 	  vTaskStartScheduler();
 	  
 	  printf("FATAL: Scheduler failed to start!\r\n");
-      while (1);  // 死循环，方便你接调试器看停在哪
+      while (1);  // 只在调度器启动失败时才会走到这里；停在此处便于调试定位
   }
