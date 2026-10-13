@@ -30,10 +30,7 @@
       // 读出来的值会飘，可能满屏乱跳。
 
       GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1;
-      // 大白话：选定 PA0 这个引脚。
-      // PA0 对应的就是 ADC 通道 0（ADC_Channel_0）。
-      // 如果光敏接在 PA1，这里就改成 GPIO_Pin_1，后面通道号改成 1。
-
+      
       GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
       // 大白话：设置引脚的翻转速度。
       // 对于输入模式，这个参数其实没有实际作用，但库函数要求你必须填一个值。
@@ -114,21 +111,22 @@
       ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;
       // 大白话：不用外部触发，我们用软件手动触发。
       // "外部触发"是指用定时器之类的东西自动启动转换。
-      // 我们是初学者，先学最简单的方式——想读的时候，代码里手动喊一声"开始！"
+     
 
       ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
-      // 大白话：关闭连续转换。每次手动触发只转换一次。
-      // 如果开启（ENABLE），ADC 会不停地转，转完一次马上开始下一次。
-      // 单次模式更省资源，我们只需要的时候才读。
+      // 开启连续转换：一次触发后 ADC 自动循环转换，配合 DMA 循环模式实现不间断采集。
+      // 若设为 DISABLE，则每次转换都要软件重新触发，无法配合 DMA 自动搬运。
+      
 
       ADC_InitStructure.ADC_ScanConvMode = ENABLE;
-      // 大白话：关闭扫描模式。每次只转换一个通道。
+      // 大白话：开启扫描模式。
       // 扫描模式是一次触发就把所有通道都转一遍。
-      // 我们只有一个光敏传感器接在通道 0，不需要扫描。
+      
 
       ADC_InitStructure.ADC_NbrOfChannel = ADC_CHANNEL_COUNT;
-      // 大白话：告诉 ADC "我要用 1 个通道"。
-      // 扫描模式下这个值才有意义，但我们还是老老实实填上。
+      // 规则组通道数 = ADC_CHANNEL_COUNT（当前为 2）。
+      // 扫描模式下按这个数量依次转换所有通道。
+     
 
       ADC_Init(ADC1, &ADC_InitStructure);
       // 大白话：把配置单提交给 ADC1，让它生效。
@@ -140,6 +138,16 @@
       ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 2, ADC_SampleTime_239Cycles5);
       // 通道 1（PA1 / NTC），排第 2 个采集。
       // 结果 →ADC_Values[1]
+      //
+      // ── 为什么两个通道的采样时间不同（55.5 vs 239.5 周期）？ ──
+      //   ADC 内部有个约 8pF 的采样保持电容，采样时要靠外部信号源给它充电。
+      //   源阻抗越高、充电越慢；采样窗口太短会导致电容没充满就断开，转换结果偏低。
+      //   实测本模块源阻抗约 3kΩ，按数据手册 55.5 周期（上限 50kΩ）本来就有 16 倍余量。
+      //   给温度通道留到 239.5 是保守余量：NTC 接在面包板上，接触电阻会漂，
+      //   更长的采样窗口对源阻抗变大更鲁棒。代价仅约 15µs，而采样周期是 200ms，无影响。
+      //
+      // ⚠️ 注意：这个值当初是「误判为采样时间不足」才改的，实测证明与那个问题无关。
+      //    真正根因是杜邦线接触不良。详见开发日志「三个被证伪的解释」。
 
       ADC_DMACmd(ADC1, ENABLE);
 

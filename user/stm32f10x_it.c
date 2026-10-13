@@ -183,7 +183,7 @@ void EXTI0_IRQHandler(void)
         {
             TickType_t now = xTaskGetTickCountFromISR();
 
-            /* 第 3 步：消抖 — 20ms 内的重复触发直接丢弃 */
+            /* 第 3 步：消抖 — 200ms 内的重复触发直接丢弃 */
             if ((now - xLastLeftTick) >= pdMS_TO_TICKS(200))
             {
                 xLastLeftTick = now;
