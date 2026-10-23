@@ -49,11 +49,8 @@ void Modbus_Init(void)
 	  Modbus_DMA_Init();
 	  Modbus_IDLE_Init();
 	  
-	  regTable[0] = 1674;                 /* 光照：假装 1674 mV */
-      regTable[1] = 1836;                 /* 温度：假装 1836 mV */
-      regTable[2] = 0;                    /* 运行时间 */
-      regTable[3] = MODBUS_SLAVE_ADDR;    /* 从机地址 */
-      regTable[4] = 800;                  /* 预留阈值 */
+	  regTable[3] = MODBUS_SLAVE_ADDR;    /* 从机地址，固定 */
+      regTable[4] = 800;                  /* 预留：光照阈值 */
 	  
      printf("Modbus: USART2 ready\r\n");
 	 uint8_t test[]="123456789";
@@ -194,6 +191,14 @@ void Modbus_Init(void)
       DMA_Cmd(DMA1_Channel6, ENABLE);
   }
 
+  void Modbus_SetRegister(uint8_t index, uint16_t value)
+  {
+	if(index<MODBUS_REG_COUNT)
+	{
+		regTable[index]=value;
+	}
+  }
+  
   static uint16_t Modbus_CRC16(uint8_t *buf, uint16_t len)
   {
 	  uint16_t crc=0xFFFF;
@@ -221,7 +226,7 @@ void Modbus_Init(void)
 		  while(USART_GetFlagStatus(USART2,USART_FLAG_TXE)==RESET);
 		  
 	  }
-	  
+	  while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET);
   }
 
   static uint16_t Modbus_BuildException(uint8_t *txBuf, uint8_t func, uint8_t errCode)

@@ -29,7 +29,7 @@ void Task_Sensor(void *pvParameters)
 		  uint16_t light_raw = ADC_Values[0];
           uint16_t ntc_raw   = ADC_Values[1];
 		  
-		  printf("raw: %d %d\r\n", light_raw, ntc_raw);   /* ←临时加 */
+		  
       
 		  /* ⚠️ 注意：这里对原始值做了取反（4096 - raw）。
 		     所以算出的 *_voltage 不是引脚上的真实电压，而是 3300mV 减它。
@@ -38,6 +38,10 @@ void Task_Sensor(void *pvParameters)
           data.light_voltage   = brightness * 3300 / 4096;
           uint16_t ntcness  = 4096 - ntc_raw;
 		  data.ntc_voltage     = ntcness * 3300 / 4096;
+		  
+		  Modbus_SetRegister(0,data.light_voltage);
+		  Modbus_SetRegister(1,data.ntc_voltage);
+		  Modbus_SetRegister(2,xTaskGetTickCount() / 1000);
 		  
 		  xQueueOverwrite(xDisplayQueue, &data);
           xQueueOverwrite(xCommQueue,&data);
