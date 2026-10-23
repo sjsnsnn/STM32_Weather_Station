@@ -6,6 +6,7 @@
   #include <stdio.h>
   #include "Button.h"    /* BTN_LEFT, BTN_RIGHT, Button_Init */
   #include "Menu.h"      /* Menu_HandleEvent, Menu_RenderCurrentPage */
+  #include "Modbus.h"
 
   /* ===== FreeRTOS 头文件 ===== */
   #include "FreeRTOS.h"
@@ -27,6 +28,8 @@ void Task_Sensor(void *pvParameters)
       {
 		  uint16_t light_raw = ADC_Values[0];
           uint16_t ntc_raw   = ADC_Values[1];
+		  
+		  printf("raw: %d %d\r\n", light_raw, ntc_raw);   /* ←临时加 */
       
 		  /* ⚠️ 注意：这里对原始值做了取反（4096 - raw）。
 		     所以算出的 *_voltage 不是引脚上的真实电压，而是 3300mV 减它。
@@ -51,6 +54,7 @@ void Task_Sensor(void *pvParameters)
 
     while (1)
     {
+		Modbus_Poll();
         /*
          * 等显示数据，最多等 100ms。
          * 这里不能用 portMAX_DELAY 死等 —— 否则按键通知要等到
@@ -113,6 +117,7 @@ int main(void)
 	  Serial_Init();
 	  OLED_Init();     // 初始化 OLED（SSD1306，GPIO 软件模拟 I2C）
       AD_Init(); 	  // 初始化 ADC — 开机调一次就够了
+	  Modbus_Init();
 	  
 	  OLED_ShowString(1, 1, "RTOSWeather");
       printf("System startup: FreeRTOS Weather Station\r\n");

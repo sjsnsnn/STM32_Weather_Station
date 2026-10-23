@@ -26,6 +26,7 @@
 #include "Button.h"        /* 按键宏 + 函数声明 */
 #include "FreeRTOS.h"
 #include "task.h"          /* xTaskNotifyFromISR */
+#include "Modbus.h"
 
 /** @addtogroup STM32F10x_StdPeriph_Template
   * @{
@@ -245,6 +246,22 @@ void EXTI1_IRQHandler(void)
 /**
   * @}
   */
+
+void USART2_IRQHandler(void)
+  {
+      /* 判断：这次中断是不是"空闲中断"引起的？ */
+      if (USART_GetITStatus(USART2, USART_IT_IDLE) != RESET)
+      {
+          /* ★清 IDLE 标志：必须先读 SR，再读 DR（手册规定） */
+          volatile uint16_t tmp;
+          tmp = USART2->SR;
+          tmp = USART2->DR;
+          (void)tmp;
+
+          /* 交给 Modbus 模块处理 */
+          Modbus_OnIdleIRQ();
+      }
+  }
 
 
 /******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
