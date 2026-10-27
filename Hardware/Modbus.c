@@ -130,6 +130,28 @@ void Modbus_Init(void)
 	
 	  }
 	  
+	  else if(func==0x06)
+	  {
+		uint16_t regAddr=(rxBuf[2]<<8)|rxBuf[3];
+		uint16_t value=(rxBuf[4]<<8)|rxBuf[5];
+		
+		  if(regAddr!=MODBUS_THRESHOLD_REG)
+		  {
+			txLen=Modbus_BuildException(txBuf,func,0x02);
+		  }
+		  else
+		  {
+			  regTable[regAddr]=value;
+			  
+			  for(uint16_t i=0;i<8;i++)
+			  {
+				txBuf[i]=rxBuf[i];
+			  }
+			  
+			  txLen=8;
+		  }
+	  }
+	  
 		else
 		{
 			txLen = Modbus_BuildException(txBuf, func, 0x01);
