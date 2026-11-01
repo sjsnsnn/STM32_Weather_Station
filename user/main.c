@@ -147,7 +147,7 @@ int main(void)
 	  Button_Init(displayHandle);
 	  
 	  Motor_Init();           /* 配置 PA4/PA5 方向脚 + TIM1_CH1/PA8 PWM */
-      Motor_SetSpeed(50);     /* 20% 占空比正转，先小占空比 */
+ /* Motor_SetSpeed(50); */  /* 开环测试结束；等新电机到了再接入任务 */   
 	
 	  vTaskStartScheduler();
 	  
