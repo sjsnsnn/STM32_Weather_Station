@@ -7,6 +7,7 @@
   #include "Button.h"    /* BTN_LEFT, BTN_RIGHT, Button_Init */
   #include "Menu.h"      /* Menu_HandleEvent, Menu_RenderCurrentPage */
   #include "Modbus.h"
+  #include "Motor.h"
 
   /* ===== FreeRTOS 头文件 ===== */
   #include "FreeRTOS.h"
@@ -144,7 +145,10 @@ int main(void)
 
 	  /* 按键中断里要给 Display 任务发通知，所以把句柄传进去 */
 	  Button_Init(displayHandle);
-
+	  
+	  Motor_Init();           /* 配置 PA4/PA5 方向脚 + TIM1_CH1/PA8 PWM */
+      Motor_SetSpeed(50);     /* 20% 占空比正转，先小占空比 */
+	
 	  vTaskStartScheduler();
 	  
 	  printf("FATAL: Scheduler failed to start!\r\n");
