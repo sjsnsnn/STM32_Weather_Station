@@ -8,6 +8,7 @@
   #include "Menu.h"      /* Menu_HandleEvent, Menu_RenderCurrentPage */
   #include "Modbus.h"
   #include "Motor.h"
+  #include "Encoder.h"
 
   /* ===== FreeRTOS 头文件 ===== */
   #include "FreeRTOS.h"
@@ -54,6 +55,7 @@ void Task_Sensor(void *pvParameters)
 {
     SensorData_t data = {0, 0};       /* 初始化为 0，防止首次显示垃圾值 */
     uint32_t btnNotifyValue = 0;      /* 存放按键通知值 */
+	static int16_t encAccum = 0;
 
     Menu_RenderCurrentPage(0, 0, 0);  /* 开机画默认页面（光照页） */
 
@@ -97,6 +99,32 @@ void Task_Sensor(void *pvParameters)
             Menu_RenderCurrentPage(data.light_voltage, data.ntc_voltage,
                                    xTaskGetTickCount() / 1000);
         }
+		
+		encAccum += Encoder_Get();   /* 每轮只调用一次 */
+		
+		if(encAccum>=4||encAccum<=-4)
+		{
+			uint16_t changed=0;
+			
+			if(encAccum>=4)
+			{
+				encAccum-=4;
+				changed=Menu_HandleEvent(BTN_RIGHT);
+			}
+			
+			if(encAccum<=-4)
+			{
+				encAccum+=4;
+				changed=Menu_HandleEvent(BTN_RIGHT);
+			}
+			
+			if(changed)
+			{
+				OLED_Clear();
+			}
+			
+			Menu_RenderCurrentPage(data.light_voltage,data.ntc_voltage,xTaskGetTickCount()/1000);
+		}
     }
 }
   
@@ -123,6 +151,7 @@ int main(void)
 	  OLED_Init();     // 初始化 OLED（SSD1306，GPIO 软件模拟 I2C）
       AD_Init(); 	  // 初始化 ADC — 开机调一次就够了
 	  Modbus_Init();
+	   
 	  
 	  OLED_ShowString(1, 1, "RTOSWeather");
       printf("System startup: FreeRTOS Weather Station\r\n");
@@ -142,11 +171,12 @@ int main(void)
 	  xTaskCreate(Task_Sensor,  "Sensor",  128, NULL, 3, NULL);
       xTaskCreate(Task_Display, "Display", 256, NULL, 1, &displayHandle);
       xTaskCreate(Task_Comm,    "Comm",    256, NULL, 2, NULL);
-
+	  
 	  /* 按键中断里要给 Display 任务发通知，所以把句柄传进去 */
 	  Button_Init(displayHandle);
 	  
-	  Motor_Init();           /* 配置 PA4/PA5 方向脚 + TIM1_CH1/PA8 PWM */
+	  Motor_Init();/* 配置 PA4/PA5 方向脚 + TIM1_CH1/PA8 PWM */
+	  Encoder_Init();
  /* Motor_SetSpeed(50); */  /* 开环测试结束；等新电机到了再接入任务 */   
 	
 	  vTaskStartScheduler();
