@@ -100,31 +100,32 @@ void Task_Sensor(void *pvParameters)
                                    xTaskGetTickCount() / 1000);
         }
 		
-		encAccum += Encoder_Get();   /* 每轮只调用一次 */
+		/*encAccum += Encoder_Get();   /* 每轮只调用一次 */
 		
-		if(encAccum>=4||encAccum<=-4)
-		{
-			uint16_t changed=0;
-			
-			if(encAccum>=4)
-			{
-				encAccum-=4;
-				changed=Menu_HandleEvent(BTN_RIGHT);
-			}
-			
-			if(encAccum<=-4)
-			{
-				encAccum+=4;
-				changed=Menu_HandleEvent(BTN_RIGHT);
-			}
-			
-			if(changed)
-			{
-				OLED_Clear();
-			}
-			
-			Menu_RenderCurrentPage(data.light_voltage,data.ntc_voltage,xTaskGetTickCount()/1000);
-		}
+//		if(encAccum>=4||encAccum<=-4)
+//		{
+//			uint16_t changed=0;
+//			
+//			if(encAccum>=4)
+//			{
+//				encAccum-=4;
+//				changed=Menu_HandleEvent(BTN_RIGHT);
+//			}
+//			
+//			if(encAccum<=-4)
+//			{
+//				encAccum+=4;
+//				changed=Menu_HandleEvent(BTN_RIGHT);
+//			}
+//			
+//			if(changed)
+//			{
+//				OLED_Clear();
+//			}
+//			
+//			Menu_RenderCurrentPage(data.light_voltage,data.ntc_voltage,xTaskGetTickCount()/1000);
+//		}
+		
     }
 }
   
@@ -141,7 +142,14 @@ void Task_Comm(void *pvParameters)
     }
 }
 
-
+ void Task_EncoderTest(void *pvParameters)
+  {
+      for (;;)
+      {
+          printf("enc=%d\r\n", Encoder_Get());
+          vTaskDelay(pdMS_TO_TICKS(200));
+      }
+  }
 
 int main(void)
   {
@@ -171,7 +179,8 @@ int main(void)
 	  xTaskCreate(Task_Sensor,  "Sensor",  128, NULL, 3, NULL);
       xTaskCreate(Task_Display, "Display", 256, NULL, 1, &displayHandle);
       xTaskCreate(Task_Comm,    "Comm",    256, NULL, 2, NULL);
-	  
+	  xTaskCreate(Task_EncoderTest, "EncTest", 256, NULL, 1, NULL);
+	
 	  /* 按键中断里要给 Display 任务发通知，所以把句柄传进去 */
 	  Button_Init(displayHandle);
 	  
