@@ -142,7 +142,22 @@ void Task_Comm(void *pvParameters)
     }
 }
 
-
+void Task_Motor(void *pvParameters)
+{
+	TickType_t lastWake=xTaskGetTickCount();
+	
+	for(;;)
+	{
+		int16_t target=(int16_t)Modbus_GetRegister(MODBUS_TARGET_SPEED_REG);
+		
+		if (target>100)  target=100;
+		else if (target<-100) target=-100;
+		
+		Motor_SetSpeed((int8_t)target);
+		
+		vTaskDelayUntil(&lastWake,pdMS_TO_TICKS(20));
+	}
+}
 
 int main(void)
   {
@@ -172,6 +187,7 @@ int main(void)
 	  xTaskCreate(Task_Sensor,  "Sensor",  128, NULL, 3, NULL);
       xTaskCreate(Task_Display, "Display", 256, NULL, 1, &displayHandle);
       xTaskCreate(Task_Comm,    "Comm",    256, NULL, 2, NULL);
+	  xTaskCreate(Task_Motor, "Motor", 128, NULL, 2, NULL);
 	
 	  /* 按键中断里要给 Display 任务发通知，所以把句柄传进去 */
 	  Button_Init(displayHandle);

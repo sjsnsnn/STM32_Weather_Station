@@ -51,6 +51,7 @@ void Modbus_Init(void)
 	  
 	  regTable[3] = MODBUS_SLAVE_ADDR;    /* 从机地址，固定 */
       regTable[4] = 800;                  /* 预留：光照阈值 */
+	  regTable[5] = 0;                    /* 新增：目标速度默认 0 */
 	  
      printf("Modbus: USART2 ready\r\n");
 	 uint8_t test[]="123456789";
@@ -135,7 +136,7 @@ void Modbus_Init(void)
 		uint16_t regAddr=(rxBuf[2]<<8)|rxBuf[3];
 		uint16_t value=(rxBuf[4]<<8)|rxBuf[5];
 		
-		  if(regAddr!=MODBUS_THRESHOLD_REG)
+		  if(regAddr!=MODBUS_THRESHOLD_REG&&regAddr!=MODBUS_TARGET_SPEED_REG)
 		  {
 			txLen=Modbus_BuildException(txBuf,func,0x02);
 		  }
@@ -263,4 +264,13 @@ void Modbus_Init(void)
 	  txBuf[idx++]=(crc>>8)&0xFF;
 	  
 	  return idx;
+  }
+
+  uint16_t Modbus_GetRegister(uint8_t index)
+  {
+	if(index>=MODBUS_REG_COUNT)
+	{
+		return 0;
+	}
+	return regTable[index];
   }
