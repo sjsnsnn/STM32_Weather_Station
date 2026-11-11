@@ -40,3 +40,12 @@
 	 TIM_SetCounter(TIM3,0);
 	 return Temp;
  }
+
+ float Encoder_GetRPM(float dt)
+ {
+	int16_t delta=Encoder_Get();
+	
+	 /* 实测标定：10 圈 = 4085，20 圈 = 8172，取 408.5 计数/圈。
+     理论 11×4×9.6= 422.4，实测偏低约 3.3%。 */
+  return delta * 60.0f / (408.5f * dt);
+ }

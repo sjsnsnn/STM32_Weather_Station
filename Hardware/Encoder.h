@@ -3,5 +3,7 @@
 
 void Encoder_Init(void);
 int16_t Encoder_Get(void);
+float Encoder_GetRPM(float dt);
+
 
 #endif

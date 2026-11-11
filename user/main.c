@@ -9,11 +9,16 @@
   #include "Modbus.h"
   #include "Motor.h"
   #include "Encoder.h"
+  #include "PID.h"
 
   /* ===== FreeRTOS 头文件 ===== */
   #include "FreeRTOS.h"
   #include "task.h"
   #include "queue.h"
+  
+  #define MOTOR_CTRL_PERIOD_MS   20
+  #define PID_CLOSED_LOOP_ENABLE   1   /* 1 = 闭环 */
+  #define MOTOR_OPEN_LOOP_TEST     0   /* 开环扫描结束 */
 
 typedef struct{
 	uint16_t light_voltage;   // 光照电压（mV）
@@ -55,7 +60,7 @@ void Task_Sensor(void *pvParameters)
 {
     SensorData_t data = {0, 0};       /* 初始化为 0，防止首次显示垃圾值 */
     uint32_t btnNotifyValue = 0;      /* 存放按键通知值 */
-	static int16_t encAccum = 0;
+	/* static int16_t encAccum = 0; */   /* 临时停用 EC11 菜单：TIM3 给电机编码器 */
 
     Menu_RenderCurrentPage(0, 0, 0);  /* 开机画默认页面（光照页） */
 
@@ -100,8 +105,9 @@ void Task_Sensor(void *pvParameters)
                                    xTaskGetTickCount() / 1000);
         }
 		
-		/* ===== EC11 旋钮翻页 ===== */
-  encAccum += Encoder_Get();
+#if 0   /* ===== EC11 旋钮翻页（临时停用：TIM3 已给电机编码器）===== */
+                /* ===== EC11 旋钮翻页 ===== */
+    encAccum += Encoder_Get();
 
   if (encAccum >= 4 || encAccum <= -4)
   {
@@ -125,9 +131,11 @@ void Task_Sensor(void *pvParameters)
                                  data.ntc_voltage,
                                  xTaskGetTickCount() / 1000);
       }
-   }	
+   }
+#endif  
     }
 }
+
   
 void Task_Comm(void *pvParameters)
 {
@@ -142,20 +150,77 @@ void Task_Comm(void *pvParameters)
     }
 }
 
+static PID_t g_pid;
+
 void Task_Motor(void *pvParameters)
 {
+	 #if PID_CLOSED_LOOP_ENABLE
+      const float dt = MOTOR_CTRL_PERIOD_MS / 1000.0f;   /* 20ms -> 0.02f */
+  #endif
+	
+	 PID_Init(&g_pid, 0.1f, 0.05f, 0.0f, -100.0f, 100.0f);
+     g_pid.deadband = 8.0f;    /* 8 RPM 死区 */
+     g_pid.d_alpha   = 0.8f;
+	
 	TickType_t lastWake=xTaskGetTickCount();
 	
 	for(;;)
 	{
-		int16_t target=(int16_t)Modbus_GetRegister(MODBUS_TARGET_SPEED_REG);
+		int16_t percent=(int16_t)Modbus_GetRegister(MODBUS_TARGET_SPEED_REG);
 		
-		if (target>100)  target=100;
-		else if (target<-100) target=-100;
+		if (percent>100)  percent=100;
+		else if (percent<-100) percent=-100;
 		
-		Motor_SetSpeed((int8_t)target);
+		if(percent==0)
+		{
+			Motor_SetSpeed(0);
+			PID_Reset(&g_pid);
+		}
+#if PID_CLOSED_LOOP_ENABLE
+          else
+          {
+			  static uint16_t print_div=0;
+			  
+              float target_rpm   = percent * MOTOR_MAX_RPM / 100.0f;
+              float measured_rpm = Encoder_GetRPM(dt);
+              float u_pid            = PID_Update(&g_pid, target_rpm, measured_rpm, dt);
+
+			  float u=percent+u_pid;
+			  
+			  if (u > 100.0f)       u = 100.0f;
+              else if (u < -100.0f) u = -100.0f;
+			  
+              Motor_SetSpeed((int8_t)u);
+			  
+			  if(++print_div>=50)
+			  {
+				print_div=0;
+				  printf("target=%d, measured=%d, u=%d\r\n",(int)target_rpm,(int)measured_rpm,(int)u);
+			  }
+          }
+  #elif MOTOR_OPEN_LOOP_TEST
+          else
+          {
+               static uint16_t print_div=0;
+			  
+              Motor_SetSpeed((int8_t)percent);
+			  
+			  if(++print_div>=50)
+			  {
+				print_div=0;
+				  printf("target=%d%%,rpm=%d\r\n",percent,(int)Encoder_GetRPM(1.0f));
+			  }
+          }
+  #else
+          else
+          {
+              Motor_SetSpeed(0);
+              PID_Reset(&g_pid);
+          }
+  #endif
 		
-		vTaskDelayUntil(&lastWake,pdMS_TO_TICKS(20));
+		
+		vTaskDelayUntil(&lastWake,pdMS_TO_TICKS(MOTOR_CTRL_PERIOD_MS));
 	}
 }
 
@@ -187,7 +252,7 @@ int main(void)
 	  xTaskCreate(Task_Sensor,  "Sensor",  128, NULL, 3, NULL);
       xTaskCreate(Task_Display, "Display", 256, NULL, 1, &displayHandle);
       xTaskCreate(Task_Comm,    "Comm",    256, NULL, 2, NULL);
-	  xTaskCreate(Task_Motor, "Motor", 128, NULL, 2, NULL);
+	  xTaskCreate(Task_Motor, "Motor", 256, NULL, 2, NULL);
 	
 	  /* 按键中断里要给 Display 任务发通知，所以把句柄传进去 */
 	  Button_Init(displayHandle);
