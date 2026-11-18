@@ -10,6 +10,7 @@
   #include "Motor.h"
   #include "Encoder.h"
   #include "PID.h"
+   #include "W25Q64.h"
 
   /* ===== FreeRTOS 头文件 ===== */
   #include "FreeRTOS.h"
@@ -224,11 +225,55 @@ void Task_Motor(void *pvParameters)
 	}
 }
 
+static void W25Q64_Test(void)
+  {
+     uint8_t wr[16] = {'W','2','5','Q','6','4',' ','T','E','S','T',' ','1','2','3','4'};
+      uint8_t rd[16];
+      uint8_t i;
+      uint8_t ok = 1;
+
+      printf("W25Q64 test: erase sector 0\r\n");
+      W25Q64_SectorErase(0x000000);
+
+      /* 第 1 次读：擦除后，应该全是 FF */
+      W25Q64_ReadData(0x000000, rd, 16);
+      printf("after erase: ");
+      for (i = 0; i < 16; i++)
+          printf("%02X ", rd[i]);
+      printf("\r\n");
+
+      printf("page program 16 bytes\r\n");
+      W25Q64_PageProgram(0x000000, wr, 16);
+
+      /* 第 2 次读：写入后，应该等于 wr */
+      W25Q64_ReadData(0x000000, rd, 16);
+      printf("read back:   ");
+      for (i = 0; i < 16; i++)
+          printf("%02X ", rd[i]);
+      printf("\r\n");
+
+      for (i = 0; i < 16; i++)
+      {
+          if (rd[i] != wr[i])
+          {
+              ok = 0;
+              break;
+          }
+      }
+
+      printf("W25Q64 test: %s\r\n", ok ? "PASS" : "FAIL");
+  }
+
 int main(void)
   {
 	  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
       
 	  Serial_Init();
+	  
+	  W25Q64_Init();
+      printf("W25Q64 ID: %06X\r\n", (unsigned int)W25Q64_ReadID());
+	  W25Q64_Test();
+	  
 	  OLED_Init();     // 初始化 OLED（SSD1306，GPIO 软件模拟 I2C）
       AD_Init(); 	  // 初始化 ADC — 开机调一次就够了
 	  Modbus_Init();

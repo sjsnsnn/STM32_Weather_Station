@@ -10,6 +10,7 @@
 | 显示 | 0.96" OLED（SSD1306） | **GPIO 软件模拟 I2C**（PB8/PB9），非硬件 I2C 外设 |
 | 人机交互 | EXTI 按键（PB0/PB1）+ 三页菜单 | 任务通知唤醒，菜单状态机 |
 | 通信 | USART1 printf + **Modbus RTU 从机**（USART2） | DMA 接收 + IDLE 分帧 + CRC16；功能码 03/06 |
+| 存储 | W25Q64 SPI Flash（SPI2） | 读 JEDEC ID、4KB 扇区擦除、256B 页写入、回读校验 |
 | 电机控制 | TB6612FNG + JGA25-370 编码器电机 | TIM1_CH1/PA8 20kHz PWM；TIM3 编码器 4 倍频 |
 | 闭环调速 | 前馈 + PID | 编码器实测 408.5 计数/圈；20/50/80% 正反转稳定 |
 
@@ -24,6 +25,9 @@
 
 [PC] ─ 0x0005 目标速度 ─> regTable[5] ─> Task_Motor(20ms) ─> TB6612 ─> 电机
 电机编码器 A/B ─> PA6/PA7 ─> TIM3 ─> Encoder_GetRPM ─> Task_Motor(前馈 + PID)
+
+W25Q64 <─ SPI2 (PB13 SCK / PB14 MISO / PB15 MOSI / PB12 CS)
+        ─> W25Q64_ReadID / SectorErase / PageProgram / ReadData
 ```
 
 - `Task_Sensor`：优先级 3，200ms；ADC+DMA 采样，更新 Modbus 寄存器 0~2，写显示/通信队列。
@@ -40,6 +44,7 @@
 - 按键：2 个，PB0/PB1，EXTI
 - 电机驱动：TB6612FNG
 - 电机：JGA25-370，6V，9.6:1，带霍尔编码器
+- 存储：W25Q64 SPI Flash（6 针模块，3.3V）
 - 调试：ST-Link V2、USB-TTL（CH340）
 - 分析：NanoDLA 逻辑分析仪（8 通道 / 24MHz）+ 万用表
 - 电源：5V USB-TTL 供 TB6612 VM；4 节 AA 电池盒备用（电压待确认，尚未用于电机测试）
@@ -137,14 +142,15 @@ USART2：PA2/PA3，115200 8N1，从机地址 1，功能码 03（读）/ 06（写
 - 当前只在 **5V** 下验证；换 6V 电池后需重新测最大转速并更新 `MOTOR_MAX_RPM`。
 - EC11 菜单暂时停用，TIM3 已让给电机编码器；待迁到 EXTI/轮询。
 - 光敏电阻需要机械固定；电机振动会导致读数跳变（固定后解决）。
-- W25Q64 SPI Flash、LVGL、MQTT、Linux 交叉编译尚未实现，不在本仓库中。
+- W25Q64 已实现 JEDEC ID、4KB 扇区擦除、单页 16 字节写入和回读校验；跨页写入、掉电保持尚未验证。
+- LVGL、MQTT、Linux 交叉编译尚未实现。
 - 传感器电压做了取反，显示的 mV 不是引脚实际电压。
 
 ## 目录结构
 
 ```text
 STM32_Weather_Station/
-├─ Hardware/     AD、OLED、Serial、Button、Menu、Modbus、Motor、PWM、Encoder、PID
+├─ Hardware/     AD、OLED、Serial、Button、Menu、Modbus、Motor、PWM、Encoder、PID、SPI、W25Q64
 ├─ user/         main.c（任务与初始化）、stm32f10x_it.c（中断）
 ├─ system/       Delay、Sys
 ├─ FreeRTOS/     FreeRTOS 内核与配置
@@ -158,6 +164,7 @@ STM32_Weather_Station/
 
 - [`docs/diagrams/README.md`](docs/diagrams/README.md) —— 时序图/状态机图说明
 - [`docs/waveforms/README.md`](docs/waveforms/README.md) —— 逻辑分析仪测量方法与复现
+- [`test/w2.6-spi-flash/spi-flash-log.md`](test/w2.6-spi-flash/spi-flash-log.md) —— SPI + W25Q64 读 ID/擦除/页写入/回读
 - [`test/w2.5-step4-pid/closed-loop-log.md`](test/w2.5-step4-pid/closed-loop-log.md) —— PID 闭环原始数据与结论
 - [`test/w2.5-step3-motor-task/motor-task-log.md`](test/w2.5-step3-motor-task/motor-task-log.md) —— Modbus 目标转速验证
 - [`test/w2.5-step2-ec11/ec11-count-log.md`](test/w2.5-step2-ec11/ec11-count-log.md) —— EC11 计数与菜单验证
