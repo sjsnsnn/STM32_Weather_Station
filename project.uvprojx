@@ -795,6 +795,16 @@
               <FileType>1</FileType>
               <FilePath>.\Hardware\W25Q64.c</FilePath>
             </File>
+            <File>
+              <FileName>Param.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\Param.h</FilePath>
+            </File>
+            <File>
+              <FileName>Param.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\Param.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

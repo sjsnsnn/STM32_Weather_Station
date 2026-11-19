@@ -213,6 +213,7 @@ void Modbus_Init(void)
       DMA_SetCurrDataCounter(DMA1_Channel6, MODBUS_BUF_SIZE);
       DMA_Cmd(DMA1_Channel6, ENABLE);
   }
+  
 
   void Modbus_SetRegister(uint8_t index, uint16_t value)
   {

@@ -10,7 +10,8 @@
   #include "Motor.h"
   #include "Encoder.h"
   #include "PID.h"
-   #include "W25Q64.h"
+  #include "W25Q64.h"
+  #include "Param.h"
 
   /* ===== FreeRTOS 头文件 ===== */
   #include "FreeRTOS.h"
@@ -63,11 +64,52 @@ void Task_Sensor(void *pvParameters)
     uint32_t btnNotifyValue = 0;      /* 存放按键通知值 */
 	/* static int16_t encAccum = 0; */   /* 临时停用 EC11 菜单：TIM3 给电机编码器 */
 
+	static uint16_t last_saved;
+    static uint16_t pending = 0;
+    static uint8_t  has_pending = 0;     /* 1 = pending 里有有效值 */
+    static TickType_t last_change = 0;
+    uint16_t threshold;
+
+    last_saved = Param_GetLightThreshold();
+	
     Menu_RenderCurrentPage(0, 0, 0);  /* 开机画默认页面（光照页） */
 
     while (1)
     {
 		Modbus_Poll();
+		
+		threshold = Modbus_GetRegister(MODBUS_THRESHOLD_REG);
+
+  if (threshold != last_saved)
+  {
+      if (!has_pending || threshold != pending)
+      {
+          /* 第一次出现新值，或值又变了：重新计时 */
+          pending = threshold;
+          has_pending = 1;
+          last_change = xTaskGetTickCount();
+      }
+      else if ((xTaskGetTickCount() - last_change) >= pdMS_TO_TICKS(1000))
+      {
+          /* 1 秒内没再变化，才写 Flash */
+          if (Param_SetLightThreshold(threshold))
+          {
+              last_saved = threshold;
+              has_pending = 0;
+              printf("Param saved: %d\r\n", threshold);
+          }
+          else
+          {
+              printf("Param save failed: %d\r\n", threshold);
+              last_change = xTaskGetTickCount();   /* 1 秒后重试 */
+          }
+      }
+  }
+  else
+  {
+      has_pending = 0;
+  }
+		
         /*
          * 等显示数据，最多等 100ms。
          * 这里不能用 portMAX_DELAY 死等 —— 否则按键通知要等到
@@ -272,12 +314,19 @@ int main(void)
 	  
 	  W25Q64_Init();
       printf("W25Q64 ID: %06X\r\n", (unsigned int)W25Q64_ReadID());
-	  W25Q64_Test();
+      /* W25Q64_Test(); */   /* 测试完成，正式运行关闭 */
 	  
 	  OLED_Init();     // 初始化 OLED（SSD1306，GPIO 软件模拟 I2C）
       AD_Init(); 	  // 初始化 ADC — 开机调一次就够了
 	  Modbus_Init();
 	   
+	   if (!Param_Init())
+  {
+      printf("Param init failed (defaults used)\r\n");
+  }
+
+  Modbus_SetRegister(MODBUS_THRESHOLD_REG, Param_GetLightThreshold());
+  printf("Light threshold = %d\r\n", Param_GetLightThreshold());
 	  
 	  OLED_ShowString(1, 1, "RTOSWeather");
       printf("System startup: FreeRTOS Weather Station\r\n");

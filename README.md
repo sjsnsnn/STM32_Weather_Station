@@ -11,6 +11,7 @@
 | 人机交互 | EXTI 按键（PB0/PB1）+ 三页菜单 | 任务通知唤醒，菜单状态机 |
 | 通信 | USART1 printf + **Modbus RTU 从机**（USART2） | DMA 接收 + IDLE 分帧 + CRC16；功能码 03/06 |
 | 存储 | W25Q64 SPI Flash（SPI2） | 读 JEDEC ID、4KB 扇区擦除、256B 页写入、回读校验 |
+| 参数存储 | W25Q64 扇区 1 保存光照阈值 | magic + version + CRC16；1 秒防抖；掉电恢复 |
 | 电机控制 | TB6612FNG + JGA25-370 编码器电机 | TIM1_CH1/PA8 20kHz PWM；TIM3 编码器 4 倍频 |
 | 闭环调速 | 前馈 + PID | 编码器实测 408.5 计数/圈；20/50/80% 正反转稳定 |
 
@@ -28,6 +29,9 @@
 
 W25Q64 <─ SPI2 (PB13 SCK / PB14 MISO / PB15 MOSI / PB12 CS)
         ─> W25Q64_ReadID / SectorErase / PageProgram / ReadData
+
+W25Q64 扇区 1 (0x001000) ─> Param_Init / Param_SetLightThreshold
+                         ─> Modbus 寄存器 4（光照阈值）
 ```
 
 - `Task_Sensor`：优先级 3，200ms；ADC+DMA 采样，更新 Modbus 寄存器 0~2，写显示/通信队列。
@@ -142,7 +146,7 @@ USART2：PA2/PA3，115200 8N1，从机地址 1，功能码 03（读）/ 06（写
 - 当前只在 **5V** 下验证；换 6V 电池后需重新测最大转速并更新 `MOTOR_MAX_RPM`。
 - EC11 菜单暂时停用，TIM3 已让给电机编码器；待迁到 EXTI/轮询。
 - 光敏电阻需要机械固定；电机振动会导致读数跳变（固定后解决）。
-- W25Q64 已实现 JEDEC ID、4KB 扇区擦除、单页 16 字节写入和回读校验；跨页写入、掉电保持尚未验证。
+- W25Q64 已实现 JEDEC ID、4KB 扇区擦除、单页写入、回读校验和光照阈值掉电存储；跨页写入、双扇区备份、写入过程掉电原子性尚未验证。
 - LVGL、MQTT、Linux 交叉编译尚未实现。
 - 传感器电压做了取反，显示的 mV 不是引脚实际电压。
 
@@ -150,7 +154,7 @@ USART2：PA2/PA3，115200 8N1，从机地址 1，功能码 03（读）/ 06（写
 
 ```text
 STM32_Weather_Station/
-├─ Hardware/     AD、OLED、Serial、Button、Menu、Modbus、Motor、PWM、Encoder、PID、SPI、W25Q64
+├─ Hardware/     AD、OLED、Serial、Button、Menu、Modbus、Motor、PWM、Encoder、PID、SPI、W25Q64、Param
 ├─ user/         main.c（任务与初始化）、stm32f10x_it.c（中断）
 ├─ system/       Delay、Sys
 ├─ FreeRTOS/     FreeRTOS 内核与配置
@@ -164,6 +168,7 @@ STM32_Weather_Station/
 
 - [`docs/diagrams/README.md`](docs/diagrams/README.md) —— 时序图/状态机图说明
 - [`docs/waveforms/README.md`](docs/waveforms/README.md) —— 逻辑分析仪测量方法与复现
+- [`test/w2.7-param-storage/param-storage-log.md`](test/w2.7-param-storage/param-storage-log.md) —— 光照阈值掉电存储验证
 - [`test/w2.6-spi-flash/spi-flash-log.md`](test/w2.6-spi-flash/spi-flash-log.md) —— SPI + W25Q64 读 ID/擦除/页写入/回读
 - [`test/w2.5-step4-pid/closed-loop-log.md`](test/w2.5-step4-pid/closed-loop-log.md) —— PID 闭环原始数据与结论
 - [`test/w2.5-step3-motor-task/motor-task-log.md`](test/w2.5-step3-motor-task/motor-task-log.md) —— Modbus 目标转速验证
