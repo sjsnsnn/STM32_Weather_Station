@@ -339,7 +339,7 @@ int main(void)
 	  
 	  W25Q64_Init();
       printf("W25Q64 ID: %06X\r\n", (unsigned int)W25Q64_ReadID());
-      /* W25Q64_Test(); */   /* 测试完成，正式运行关闭 */
+      /* W25Q64_Test(); */   
 	  
 	  OLED_Init();     // 初始化 OLED（SSD1306，GPIO 软件模拟 I2C）
       AD_Init(); 	  // 初始化 ADC — 开机调一次就够了
