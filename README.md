@@ -12,6 +12,7 @@
 | 通信 | USART1 printf + **Modbus RTU 从机**（USART2） | DMA 接收 + IDLE 分帧 + CRC16；功能码 03/06 |
 | 存储 | W25Q64 SPI Flash（SPI2） | 读 JEDEC ID、4KB 扇区擦除、256B 页写入、回读校验 |
 | 参数存储 | W25Q64 扇区 1 保存光照阈值 | magic + version + CRC16；1 秒防抖；掉电恢复 |
+| 系统调优 | FreeRTOS 栈水位测量 | 四任务总栈 896→464 words，释放约 1.7KB RAM，最小剩余栈 ≥40 words |
 | 电机控制 | TB6612FNG + JGA25-370 编码器电机 | TIM1_CH1/PA8 20kHz PWM；TIM3 编码器 4 倍频 |
 | 闭环调速 | 前馈 + PID | 编码器实测 408.5 计数/圈；20/50/80% 正反转稳定 |
 
@@ -168,6 +169,7 @@ STM32_Weather_Station/
 
 - [`docs/diagrams/README.md`](docs/diagrams/README.md) —— 时序图/状态机图说明
 - [`docs/waveforms/README.md`](docs/waveforms/README.md) —— 逻辑分析仪测量方法与复现
+- [`test/w2.8-stack-watermark/stack-watermark-log.md`](test/w2.8-stack-watermark/stack-watermark-log.md) —— FreeRTOS 栈水位测量与 RAM 优化
 - [`test/w2.7-param-storage/param-storage-log.md`](test/w2.7-param-storage/param-storage-log.md) —— 光照阈值掉电存储验证
 - [`test/w2.6-spi-flash/spi-flash-log.md`](test/w2.6-spi-flash/spi-flash-log.md) —— SPI + W25Q64 读 ID/擦除/页写入/回读
 - [`test/w2.5-step4-pid/closed-loop-log.md`](test/w2.5-step4-pid/closed-loop-log.md) —— PID 闭环原始数据与结论

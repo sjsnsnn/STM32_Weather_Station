@@ -29,6 +29,11 @@ typedef struct{
 
 QueueHandle_t xDisplayQueue = NULL;
 QueueHandle_t xCommQueue    = NULL;
+TaskHandle_t g_sensorHandle  = NULL;
+TaskHandle_t g_displayHandle = NULL;
+TaskHandle_t g_commHandle    = NULL;
+TaskHandle_t g_motorHandle   = NULL;
+
 
 void Task_Sensor(void *pvParameters)
 {
@@ -181,17 +186,37 @@ void Task_Sensor(void *pvParameters)
 
   
 void Task_Comm(void *pvParameters)
-{
-    SensorData_t data;
-    while (1)
-    {
-        if (xQueueReceive(xCommQueue, &data, portMAX_DELAY) == pdTRUE)
-        {
-            printf("Light: %d mV | NTC: %d mV\r\n", data.light_voltage, data.ntc_voltage);
-        }
-        vTaskDelay(pdMS_TO_TICKS(1000)); // 每 1 秒发一次
-    }
-}
+  {
+      SensorData_t data;
+      uint32_t report_cnt = 0;
+
+      while (1)
+      {
+          if (xQueueReceive(xCommQueue, &data, portMAX_DELAY) == pdTRUE)
+          {
+              printf("Light: %d mV | NTC: %d mV\r\n",
+                     data.light_voltage, data.ntc_voltage);
+
+              /* 每 5 次（约 5 秒）打印一次，避免刷屏 */
+              if (++report_cnt >= 5)
+              {
+                  report_cnt = 0;
+
+                  printf("Stack HWM (words) -> Sensor:%lu, Display:%lu, Comm:%lu, Motor:%lu | FreeHeap:%u B, MinFreeHeap:%uB\r\n",
+				         (unsigned long)uxTaskGetStackHighWaterMark(g_sensorHandle),
+                         (unsigned long)uxTaskGetStackHighWaterMark(g_displayHandle),
+                         (unsigned long)uxTaskGetStackHighWaterMark(g_commHandle),
+                         (unsigned long)uxTaskGetStackHighWaterMark(g_motorHandle),
+                         (unsigned int)xPortGetFreeHeapSize(),
+                         (unsigned int)xPortGetMinimumEverFreeHeapSize());
+              }
+          }
+
+          vTaskDelay(pdMS_TO_TICKS(1000));
+      }
+  }
+
+
 
 static PID_t g_pid;
 
@@ -340,16 +365,34 @@ int main(void)
         while (1);
     }
 
-	  /* 用于接住 Display 任务的句柄，后面要交给 Button_Init */
-	  TaskHandle_t displayHandle;
+	  
 
-	  xTaskCreate(Task_Sensor,  "Sensor",  128, NULL, 3, NULL);
-      xTaskCreate(Task_Display, "Display", 256, NULL, 1, &displayHandle);
-      xTaskCreate(Task_Comm,    "Comm",    256, NULL, 2, NULL);
-	  xTaskCreate(Task_Motor, "Motor", 256, NULL, 2, NULL);
+	 if (xTaskCreate(Task_Sensor,  "Sensor",  64,  NULL, 3, &g_sensorHandle) != pdPASS)
+  {
+      printf("Task create failed: Sensor\r\n");
+      while (1);
+  }
+
+  if (xTaskCreate(Task_Display, "Display", 192, NULL, 1, &g_displayHandle) != pdPASS)
+  {
+      printf("Task create failed: Display\r\n");
+      while (1);
+  }
+
+  if (xTaskCreate(Task_Comm,    "Comm",    112, NULL, 2, &g_commHandle) != pdPASS)
+  {
+      printf("Task create failed: Comm\r\n");
+      while (1);
+  }
+
+  if (xTaskCreate(Task_Motor,   "Motor",   96,  NULL, 2, &g_motorHandle) != pdPASS)
+  {
+      printf("Task create failed: Motor\r\n");
+      printf("Check configTOTAL_HEAP_SIZE.\r\n");
+      while (1);
+  }
 	
-	  /* 按键中断里要给 Display 任务发通知，所以把句柄传进去 */
-	  Button_Init(displayHandle);
+          Button_Init(g_displayHandle);
 	  
 	  Motor_Init();/* 配置 PA4/PA5 方向脚 + TIM1_CH1/PA8 PWM */
 	  Encoder_Init();
